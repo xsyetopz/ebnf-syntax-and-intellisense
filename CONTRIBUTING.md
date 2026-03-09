@@ -10,11 +10,14 @@ This project adheres to a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By 
 
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/ebnf-syntax-and-intellisense.git
    cd ebnf-syntax-and-intellisense
    ```
+
 3. **Install dependencies**:
+
    ```bash
    bun install
    ```
@@ -70,7 +73,7 @@ TypeScript code in `client/src/`:
 
 Use the conventional commit format:
 
-```
+```text
 type(scope): subject
 
 body...
@@ -81,6 +84,7 @@ Co-Authored-By: Your Name <your.email@example.com>
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
 
 Examples:
+
 - `feat(grammar): fix repetition-count scoping`
 - `fix(completion): handle rule names with hyphens`
 - `docs(readme): clarify markdown support`
@@ -97,9 +101,11 @@ Before opening an issue:
 ## Submitting Pull Requests
 
 1. Create a feature branch from `main`:
+
    ```bash
    git checkout -b feat/your-feature
    ```
+
 2. Make your changes and commit with clear messages
 3. Push to your fork and open a pull request on GitHub
 4. Describe what your PR addresses
