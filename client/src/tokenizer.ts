@@ -52,7 +52,10 @@ function isAlphaNumOrHyphen(ch: string): boolean {
 const OPERATOR_KINDS: Record<string, TokenKind> = {
 	"=": TokenKind.Equals,
 	";": TokenKind.Semicolon,
+	".": TokenKind.Semicolon,
 	"|": TokenKind.Pipe,
+	"!": TokenKind.Pipe,
+	"/": TokenKind.Pipe,
 	",": TokenKind.Comma,
 	"-": TokenKind.Minus,
 	"*": TokenKind.Asterisk,
@@ -96,26 +99,68 @@ export function tokenize(text: string): Token[] {
 		const start = currentPos();
 		const tokenStart = i;
 
-		if (currentChar() === "(" && peekChar() === "*") {
-			let depth = 1;
-			advance();
-			advance();
-			while (i < text.length && depth > 0) {
-				if (currentChar() === "(" && peekChar() === "*") {
-					depth++;
-					advance();
-					advance();
-				} else if (currentChar() === "*" && peekChar() === ")") {
-					depth--;
-					advance();
-					advance();
-				} else {
-					advance();
+		if (currentChar() === "(") {
+			if (peekChar() === "*") {
+				let depth = 1;
+				advance();
+				advance();
+				while (i < text.length && depth > 0) {
+					if (currentChar() === "(" && peekChar() === "*") {
+						depth++;
+						advance();
+						advance();
+					} else if (currentChar() === "*" && peekChar() === ")") {
+						depth--;
+						advance();
+						advance();
+					} else {
+						advance();
+					}
 				}
+				tokens.push({
+					kind: TokenKind.Comment,
+					text: text.slice(tokenStart, i),
+					range: new Range(start, currentPos()),
+				});
+				continue;
+			} else if (peekChar() === "/") {
+				advance();
+				advance();
+				tokens.push({
+					kind: TokenKind.BracketOpen,
+					text: "(/",
+					range: new Range(start, currentPos()),
+				});
+				continue;
+			} else if (peekChar() === ":") {
+				advance();
+				advance();
+				tokens.push({
+					kind: TokenKind.BraceOpen,
+					text: "(:",
+					range: new Range(start, currentPos()),
+				});
+				continue;
 			}
+		}
+
+		if (currentChar() === "/" && peekChar() === ")") {
+			advance();
+			advance();
 			tokens.push({
-				kind: TokenKind.Comment,
-				text: text.slice(tokenStart, i),
+				kind: TokenKind.BracketClose,
+				text: "/)",
+				range: new Range(start, currentPos()),
+			});
+			continue;
+		}
+
+		if (currentChar() === ":" && peekChar() === ")") {
+			advance();
+			advance();
+			tokens.push({
+				kind: TokenKind.BraceClose,
+				text: ":)",
 				range: new Range(start, currentPos()),
 			});
 			continue;
