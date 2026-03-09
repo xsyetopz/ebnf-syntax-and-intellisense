@@ -29,6 +29,16 @@ export interface Token {
 	range: Range;
 }
 
+export interface TokenDiagnostic {
+	message: string;
+	range: Range;
+}
+
+export interface TokenizeResult {
+	tokens: Token[];
+	diagnostics: TokenDiagnostic[];
+}
+
 function pos(line: number, character: number): Position {
 	return { line, character } as Position;
 }
@@ -67,8 +77,9 @@ const OPERATOR_KINDS: Record<string, TokenKind> = {
 	"}": TokenKind.BraceClose,
 };
 
-export function tokenize(text: string): Token[] {
+export function tokenize(text: string): TokenizeResult {
 	const tokens: Token[] = [];
+	const diagnostics: TokenDiagnostic[] = [];
 	let line = 0;
 	let column = 0;
 	let i = 0;
@@ -117,11 +128,18 @@ export function tokenize(text: string): Token[] {
 						advance();
 					}
 				}
+				const commentRange = new Range(start, currentPos());
 				tokens.push({
 					kind: TokenKind.Comment,
 					text: text.slice(tokenStart, i),
-					range: new Range(start, currentPos()),
+					range: commentRange,
 				});
+				if (depth > 0) {
+					diagnostics.push({
+						message: "Unterminated comment \u2014 missing closing \"*)\"",
+						range: commentRange,
+					});
+				}
 				continue;
 			} else if (peekChar() === "/") {
 				advance();
@@ -174,14 +192,22 @@ export function tokenize(text: string): Token[] {
 				}
 				advance();
 			}
-			if (i < text.length && currentChar() === "'") {
+			const closed = i < text.length && currentChar() === "'";
+			if (closed) {
 				advance();
 			}
+			const stringRange = new Range(start, currentPos());
 			tokens.push({
 				kind: TokenKind.StringSingle,
 				text: text.slice(tokenStart, i),
-				range: new Range(start, currentPos()),
+				range: stringRange,
 			});
+			if (!closed) {
+				diagnostics.push({
+					message: "Unterminated string \u2014 missing closing \"'\"",
+					range: stringRange,
+				});
+			}
 			continue;
 		}
 
@@ -193,14 +219,22 @@ export function tokenize(text: string): Token[] {
 				}
 				advance();
 			}
-			if (i < text.length && currentChar() === '"') {
+			const closed = i < text.length && currentChar() === '"';
+			if (closed) {
 				advance();
 			}
+			const stringRange = new Range(start, currentPos());
 			tokens.push({
 				kind: TokenKind.StringDouble,
 				text: text.slice(tokenStart, i),
-				range: new Range(start, currentPos()),
+				range: stringRange,
 			});
+			if (!closed) {
+				diagnostics.push({
+					message: "Unterminated string \u2014 missing closing '\"'",
+					range: stringRange,
+				});
+			}
 			continue;
 		}
 
@@ -266,5 +300,5 @@ export function tokenize(text: string): Token[] {
 		});
 	}
 
-	return tokens;
+	return { tokens, diagnostics };
 }
