@@ -15,6 +15,7 @@
     },
   },
   "trustedDependencies": [
+    "keytar",
     "@biomejs/biome",
     "@vscode/vsce-sign",
   ],
