@@ -6,10 +6,14 @@ import {
 	type TextDocument,
 } from "vscode";
 import type { DocumentManager } from "../document-manager";
+import type { WorkspaceIndex } from "../workspace-index";
 import { getWordLookup } from "./word-at-position";
 
 export class EbnfDefinitionProvider implements DefinitionProvider {
-	constructor(private readonly manager: DocumentManager) {}
+	constructor(
+		private readonly manager: DocumentManager,
+		private readonly workspaceIndex?: WorkspaceIndex,
+	) {}
 
 	provideDefinition(
 		doc: TextDocument,
@@ -22,10 +26,20 @@ export class EbnfDefinitionProvider implements DefinitionProvider {
 		}
 
 		const definitions = lookup.symbolTable.definitions.get(lookup.word);
-		if (!definitions || definitions.length === 0) {
-			return undefined;
+		if (definitions && definitions.length > 0) {
+			return definitions.map((rule) => new Location(doc.uri, rule.nameRange));
 		}
 
-		return definitions.map((rule) => new Location(doc.uri, rule.nameRange));
+		// Fall back to workspace-wide search
+		if (this.workspaceIndex) {
+			const workspaceDefs = this.workspaceIndex.findDefinitions(lookup.word);
+			if (workspaceDefs.length > 0) {
+				return workspaceDefs.map(
+					(entry) => new Location(entry.uri, entry.rule.nameRange),
+				);
+			}
+		}
+
+		return undefined;
 	}
 }

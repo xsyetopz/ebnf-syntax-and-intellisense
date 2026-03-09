@@ -7,10 +7,14 @@ import {
 	type TextDocument,
 } from "vscode";
 import type { DocumentManager } from "../document-manager";
+import type { WorkspaceIndex } from "../workspace-index";
 import { getWordLookup } from "./word-at-position";
 
 export class EbnfReferenceProvider implements ReferenceProvider {
-	constructor(private readonly manager: DocumentManager) {}
+	constructor(
+		private readonly manager: DocumentManager,
+		private readonly workspaceIndex?: WorkspaceIndex,
+	) {}
 
 	provideReferences(
 		doc: TextDocument,
@@ -24,6 +28,7 @@ export class EbnfReferenceProvider implements ReferenceProvider {
 		}
 
 		const locations: Location[] = [];
+		const currentUri = doc.uri.toString();
 
 		if (context.includeDeclaration) {
 			const defs = lookup.symbolTable.definitions.get(lookup.word);
@@ -38,6 +43,34 @@ export class EbnfReferenceProvider implements ReferenceProvider {
 		if (refs) {
 			for (const ref of refs) {
 				locations.push(new Location(doc.uri, ref.range));
+			}
+		}
+
+		// Add cross-file references from workspace index
+		if (this.workspaceIndex) {
+			for (const file of this.workspaceIndex.getAllFiles()) {
+				// Skip current file (already handled above)
+				if (file.uri.toString() === currentUri) {
+					continue;
+				}
+
+				// Include declarations from other files
+				if (context.includeDeclaration) {
+					const defs = file.symbolTable.definitions.get(lookup.word);
+					if (defs) {
+						for (const rule of defs) {
+							locations.push(new Location(file.uri, rule.nameRange));
+						}
+					}
+				}
+
+				// Include references from other files
+				const fileRefs = file.symbolTable.references.get(lookup.word);
+				if (fileRefs) {
+					for (const ref of fileRefs) {
+						locations.push(new Location(file.uri, ref.range));
+					}
+				}
 			}
 		}
 
