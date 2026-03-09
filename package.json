@@ -76,6 +76,11 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Enable/disable diagnostics for EBNF files."
+				},
+				"ebnf.diagnostics.unusedRules": {
+					"type": "boolean",
+					"default": true,
+					"description": "Report rules that are defined but never referenced (as hints)."
 				}
 			}
 		}
