@@ -3,7 +3,7 @@
   "type": "module",
   "displayName": "EBNF Syntax Highlighting and Intellisense",
   "description": "ISO/IEC 14977 EBNF grammar support with syntax highlighting, go-to definition, hover, completions, diagnostics, and more",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "xsyetopz"
   },
