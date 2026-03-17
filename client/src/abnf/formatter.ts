@@ -16,7 +16,6 @@ interface RuleBlock {
 	name: string;
 	operator: "=" | "=/";
 	bodyTokens: AbnfToken[];
-	trailingComment: AbnfToken | null;
 }
 
 interface StandaloneComment {
@@ -77,7 +76,6 @@ export class AbnfFormattingProvider implements DocumentFormattingEditProvider {
 
 interface RuleBodyCollection {
 	bodyTokens: AbnfToken[];
-	trailingComment: AbnfToken | null;
 	nextIndex: number;
 }
 
@@ -103,12 +101,45 @@ function isNextLineRuleStart(
 	return false;
 }
 
+function isRuleEndAfterComment(tokens: AbnfToken[], pos: number): boolean {
+	if (pos >= tokens.length) {
+		return true;
+	}
+	if (isNextLineRuleStart(tokens, pos)) {
+		return true;
+	}
+	const peek = tokens[pos];
+	if (peek === undefined || peek.kind === AbnfTokenKind.Newline) {
+		return true;
+	}
+	const wsAfter = skipWhitespace(tokens, pos);
+	const afterWs = tokens[wsAfter];
+	if (afterWs?.kind === AbnfTokenKind.Comment && afterWs.column === 0) {
+		return true;
+	}
+	return false;
+}
+
+function handleBodyComment(
+	tokens: AbnfToken[],
+	bodyTokens: AbnfToken[],
+	cur: AbnfToken,
+	i: number,
+): { nextIndex: number; done: boolean } {
+	if (cur.column === 0) {
+		return { nextIndex: i, done: true };
+	}
+	bodyTokens.push(cur);
+	let next = i + 1;
+	next = consumeNewline(tokens, next);
+	return { nextIndex: next, done: isRuleEndAfterComment(tokens, next) };
+}
+
 function collectRuleBody(
 	tokens: AbnfToken[],
 	startIndex: number,
 ): RuleBodyCollection {
 	const bodyTokens: AbnfToken[] = [];
-	let trailingComment: AbnfToken | null = null;
 	let i = startIndex;
 
 	while (i < tokens.length) {
@@ -118,17 +149,17 @@ function collectRuleBody(
 		}
 
 		if (cur.kind === AbnfTokenKind.Comment) {
-			trailingComment = cur;
-			i++;
-			i = consumeNewline(tokens, i);
-			break;
+			const result = handleBodyComment(tokens, bodyTokens, cur, i);
+			i = result.nextIndex;
+			if (result.done) {
+				break;
+			}
+			continue;
 		}
 
 		if (cur.kind === AbnfTokenKind.Newline) {
 			i++;
-			const savedI = i;
 			if (isNextLineRuleStart(tokens, i)) {
-				i = savedI;
 				break;
 			}
 			bodyTokens.push(cur);
@@ -139,7 +170,7 @@ function collectRuleBody(
 		i++;
 	}
 
-	return { bodyTokens, trailingComment, nextIndex: i };
+	return { bodyTokens, nextIndex: i };
 }
 
 interface ParseRuleResult {
@@ -186,7 +217,6 @@ function parseRuleDefinition(
 			name: ruleName,
 			operator,
 			bodyTokens: collected.bodyTokens,
-			trailingComment: collected.trailingComment,
 		},
 		nextIndex: collected.nextIndex,
 	};
@@ -408,11 +438,14 @@ function formatRule(
 	);
 
 	if (bodyTokens.length === 0) {
-		const header = `${definitionPrefix.trimEnd()}`;
-		if (rule.trailingComment) {
-			return `${header}  ${rule.trailingComment.text}`;
-		}
-		return header;
+		return definitionPrefix.trimEnd();
+	}
+
+	const realTokens = bodyTokens.filter((t) => t.kind !== AbnfTokenKind.Comment);
+	if (realTokens.length === 0) {
+		const header = definitionPrefix.trimEnd();
+		const comment = bodyTokens.find((t) => t.kind === AbnfTokenKind.Comment);
+		return comment ? `${header}  ${comment.text}` : header;
 	}
 
 	const formattedBody = buildBody(
@@ -427,11 +460,6 @@ function formatRule(
 	const continuationLines = formattedBody.continuationLines;
 
 	const allLines = [firstLine, ...continuationLines];
-
-	if (rule.trailingComment) {
-		allLines[0] = `${allLines[0]}  ${rule.trailingComment.text}`;
-	}
-
 	return allLines.join("\n");
 }
 
@@ -490,6 +518,11 @@ function buildBody(
 			break;
 		}
 		const prev = i > 0 ? (tokens[i - 1] ?? null) : null;
+
+		if (tok.kind === AbnfTokenKind.Comment) {
+			current += `  ${tok.text}`;
+			continue;
+		}
 
 		if (tok.kind === AbnfTokenKind.Alternation && depth === 0) {
 			lines.push(current);
